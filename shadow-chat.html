@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>ShadowTalk</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#060810; --surface:#0d1117; --panel:#111827;
+  --border:#1f2937; --accent:#00ff9f; --accent2:#7c3aed;
+  --danger:#ef4444; --text:#e2e8f0; --muted:#64748b;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;width:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:'Space Mono',monospace;}
+
+body::before{content:'';position:fixed;inset:0;
+  background-image:linear-gradient(rgba(0,255,159,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,255,159,.03) 1px,transparent 1px);
+  background-size:36px 36px;animation:gridMove 20s linear infinite;pointer-events:none;z-index:0;}
+@keyframes gridMove{to{background-position:0 36px;}}
+
+.particle{position:fixed;border-radius:50%;background:var(--accent);animation:floatUp linear infinite;opacity:0;pointer-events:none;z-index:0;}
+@keyframes floatUp{0%{transform:translateY(100vh);opacity:0;}10%{opacity:.5;}90%{opacity:.2;}100%{transform:translateY(-5vh);opacity:0;}}
+
+/* ── PAGES ── */
+.page{position:fixed;inset:0;display:flex;flex-direction:column;z-index:10;background:var(--bg);transition:transform .32s cubic-bezier(.4,0,.2,1);will-change:transform;}
+.page.slide-right{transform:translateX(100%);}
+.page.slide-left{transform:translateX(-30%);}
+.page.active{transform:translateX(0);}
+#page-login{align-items:center;justify-content:center;}
+
+/* ── LOADER ── */
+#loader{position:fixed;inset:0;background:var(--bg);z-index:999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;transition:opacity .4s;}
+#loader.hide{opacity:0;pointer-events:none;}
+.loader-ring{width:46px;height:46px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.loader-txt{font-size:11px;color:var(--muted);letter-spacing:3px;text-transform:uppercase;}
+
+/* ── TOAST ── */
+.toast{position:fixed;top:16px;left:50%;transform:translateX(-50%) translateY(-90px);background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:10px 18px;font-size:12px;transition:transform .4s cubic-bezier(.34,1.56,.64,1);z-index:9999;white-space:nowrap;max-width:88vw;text-align:center;}
+.toast.show{transform:translateX(-50%) translateY(0);}
+.toast.success{border-color:var(--accent);color:var(--accent);}
+.toast.error{border-color:var(--danger);color:var(--danger);}
+.toast.info{border-color:var(--accent2);color:var(--accent2);}
+
+/* ── LOGIN ── */
+.login-wrap{width:min(400px,94vw);display:flex;flex-direction:column;align-items:center;gap:28px;}
+.brand{text-align:center;}
+.brand-icon{font-size:52px;display:block;margin-bottom:10px;animation:glowPulse 3s ease infinite;}
+@keyframes glowPulse{0%,100%{filter:drop-shadow(0 0 14px rgba(0,255,159,.5));}50%{filter:drop-shadow(0 0 34px rgba(0,255,159,.9));}}
+.brand-name{font-family:'Syne',sans-serif;font-weight:800;font-size:36px;background:linear-gradient(135deg,var(--accent),#00b4d8);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.brand-sub{font-size:10px;letter-spacing:3px;color:var(--muted);text-transform:uppercase;margin-top:5px;}
+
+.auth-card{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:26px;position:relative;overflow:hidden;box-shadow:0 0 60px rgba(0,0,0,.6);}
+.auth-card::after{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--accent),transparent);animation:topline 3s ease infinite;}
+@keyframes topline{0%,100%{opacity:.3;}50%{opacity:1;}}
+
+.tabs{display:flex;gap:4px;background:var(--bg);padding:4px;border-radius:10px;margin-bottom:22px;}
+.tab{flex:1;padding:9px;border:none;border-radius:8px;background:transparent;color:var(--muted);font-family:'Space Mono',monospace;font-size:11px;letter-spacing:1px;text-transform:uppercase;cursor:pointer;transition:all .2s;}
+.tab.on{background:var(--accent);color:#000;font-weight:700;box-shadow:0 0 12px rgba(0,255,159,.3);}
+
+.fgroup{margin-bottom:13px;}
+.flabel{display:block;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;}
+.finput{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:9px;padding:11px 13px;color:var(--text);font-family:'Space Mono',monospace;font-size:13px;outline:none;transition:border-color .2s;}
+.finput:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(0,255,159,.08);}
+.finput::placeholder{color:var(--muted);}
+.irow{display:flex;gap:7px;}.irow .finput{flex:1;}
+.gen-btn{padding:11px 13px;background:var(--panel);border:1px solid var(--border);border-radius:9px;color:var(--accent);cursor:pointer;font-size:15px;transition:all .2s;}
+.gen-btn:hover{background:rgba(0,255,159,.1);border-color:var(--accent);}
+.errtxt{font-size:11px;color:var(--danger);margin-top:8px;display:none;padding:7px 11px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:7px;}
+.errtxt.on{display:block;}
+.sbtn{width:100%;padding:13px;background:var(--accent);border:none;border-radius:11px;color:#000;font-family:'Syne',sans-serif;font-weight:700;font-size:14px;letter-spacing:1px;cursor:pointer;transition:all .25s;margin-top:10px;text-transform:uppercase;position:relative;overflow:hidden;}
+.sbtn::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.2),transparent);transform:translateX(-100%);transition:transform .4s;}
+.sbtn:hover::after{transform:translateX(100%);}
+.sbtn:hover{box-shadow:0 0 28px rgba(0,255,159,.4);transform:translateY(-1px);}
+.sbtn:disabled{opacity:.5;cursor:not-allowed;transform:none;}
+
+/* ── TOPBAR ── */
+.topbar{display:flex;align-items:center;gap:10px;padding:0 14px;height:60px;flex-shrink:0;background:var(--surface);border-bottom:1px solid var(--border);z-index:5;}
+.topbar-title{font-family:'Syne',sans-serif;font-weight:700;font-size:17px;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.topbar-sub{font-size:10px;color:var(--accent);letter-spacing:1px;}
+.topbar-stack{flex:1;display:flex;flex-direction:column;gap:1px;min-width:0;}
+.back-btn,.icon-action{width:40px;height:40px;display:flex;align-items:center;justify-content:center;background:var(--panel);border:1px solid var(--border);border-radius:11px;cursor:pointer;font-size:15px;transition:all .2s;color:var(--text);flex-shrink:0;font-family:'Space Mono',monospace;}
+.back-btn:hover,.icon-action:hover{border-color:var(--accent);color:var(--accent);}
+.enc-pill{display:inline-flex;align-items:center;gap:4px;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--accent);background:rgba(0,255,159,.07);border:1px solid rgba(0,255,159,.18);padding:3px 9px;border-radius:100px;flex-shrink:0;}
+
+/* ── CONTACTS ── */
+.my-id-bar{display:flex;align-items:center;padding:10px 14px;background:rgba(0,255,159,.03);border-bottom:1px solid var(--border);flex-shrink:0;}
+.my-id-pill{flex:1;display:flex;align-items:center;gap:8px;background:var(--bg);border:1px solid var(--border);border-radius:9px;padding:7px 11px;}
+.mid-label{color:var(--muted);font-size:9px;letter-spacing:1px;white-space:nowrap;}
+.mid-val{flex:1;color:var(--accent);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.copy-btn{padding:4px 9px;background:rgba(0,255,159,.1);border:1px solid rgba(0,255,159,.2);border-radius:6px;color:var(--accent);font-size:10px;cursor:pointer;font-family:'Space Mono',monospace;transition:all .2s;white-space:nowrap;}
+.copy-btn:hover{background:rgba(0,255,159,.2);}
+
+.add-bar{display:flex;gap:8px;align-items:center;padding:11px 14px;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--surface);}
+.add-input{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:9px;padding:11px 13px;color:var(--text);font-family:'Space Mono',monospace;font-size:12px;outline:none;transition:border-color .2s;}
+.add-input:focus{border-color:var(--accent);}
+.add-input::placeholder{color:var(--muted);}
+.add-go{padding:11px 16px;background:var(--accent2);border:none;border-radius:9px;color:#fff;font-family:'Space Mono',monospace;font-size:12px;cursor:pointer;transition:all .2s;white-space:nowrap;}
+.add-go:hover{background:#6d28d9;box-shadow:0 0 14px rgba(124,58,237,.4);}
+
+.contacts-scroll{flex:1;overflow-y:auto;padding:6px 10px;}
+.contacts-scroll::-webkit-scrollbar{width:3px;}
+.contacts-scroll::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+.sec-label{font-size:9px;letter-spacing:3px;text-transform:uppercase;color:var(--muted);padding:8px 4px 5px;}
+
+.contact-row{display:flex;align-items:center;gap:12px;padding:13px 10px;border-radius:12px;cursor:pointer;transition:all .2s;border:1px solid transparent;}
+.contact-row:hover{background:rgba(0,255,159,.05);}
+.contact-row:active{background:rgba(0,255,159,.1);}
+.c-avatar{width:48px;height:48px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;position:relative;}
+.c-online{position:absolute;bottom:-1px;right:-1px;width:12px;height:12px;border-radius:50%;background:var(--accent);border:2px solid var(--surface);animation:blink 2.5s ease infinite;}
+@keyframes blink{0%,100%{opacity:1;}50%{opacity:.3;}}
+.c-info{flex:1;min-width:0;}
+.c-name{font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.c-preview{font-size:11px;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.chat-btn{display:flex;align-items:center;gap:5px;padding:7px 12px;background:rgba(0,255,159,.08);border:1px solid rgba(0,255,159,.2);border-radius:8px;color:var(--accent);font-size:11px;font-family:'Space Mono',monospace;transition:all .2s;flex-shrink:0;}
+.contact-row:hover .chat-btn{background:rgba(0,255,159,.18);border-color:var(--accent);}
+
+.empty-state{text-align:center;padding:40px 20px;color:var(--muted);font-size:12px;line-height:2;}
+.empty-icon{font-size:40px;display:block;margin-bottom:12px;opacity:.3;}
+.logout-btn{margin:10px 14px 14px;padding:12px;background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.15);border-radius:11px;color:var(--danger);font-family:'Space Mono',monospace;font-size:12px;cursor:pointer;text-align:center;transition:all .2s;flex-shrink:0;}
+.logout-btn:hover{background:rgba(239,68,68,.13);}
+
+/* ── CHAT ── */
+.msgs{flex:1;overflow-y:auto;padding:16px 14px;display:flex;flex-direction:column;gap:4px;scroll-behavior:smooth;}
+.msgs::-webkit-scrollbar{width:3px;}
+.msgs::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+.divider{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:10px;letter-spacing:2px;text-transform:uppercase;margin:10px 0;}
+.divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--border);}
+
+.mg{display:flex;flex-direction:column;gap:2px;margin-bottom:6px;animation:msgIn .28s ease both;}
+@keyframes msgIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+.mg.out{align-items:flex-end;}.mg.in{align-items:flex-start;}
+.msg-sender{font-size:10px;color:var(--muted);letter-spacing:1px;padding:0 10px;}
+.bubble{max-width:75%;padding:10px 14px;border-radius:16px;font-size:13px;line-height:1.55;word-break:break-word;}
+.mg.out .bubble{background:linear-gradient(135deg,#162640,#1a1f35);border:1px solid rgba(0,180,216,.22);border-bottom-right-radius:4px;color:#c8e6ff;}
+.mg.in .bubble{background:var(--panel);border:1px solid var(--border);border-bottom-left-radius:4px;}
+.msg-time{font-size:10px;color:var(--muted);padding:0 10px;}
+
+/* File bubble */
+.fbubble{display:flex;align-items:center;gap:10px;padding:11px 14px;background:var(--panel);border:1px solid var(--border);border-radius:14px;max-width:260px;cursor:pointer;transition:all .2s;text-decoration:none;}
+.fbubble:hover{border-color:var(--accent);}
+.ficon{width:38px;height:38px;background:rgba(0,255,159,.1);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+.fmeta{flex:1;min-width:0;}
+.fname{font-size:12px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text);}
+.fsize{font-size:10px;color:var(--muted);margin-top:2px;}
+.imgprev{max-width:220px;max-height:260px;border-radius:12px;cursor:zoom-in;transition:transform .2s;object-fit:cover;}
+.imgprev:hover{transform:scale(1.02);}
+
+/* Voice bubble */
+.vbubble{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:14px;min-width:190px;max-width:260px;}
+.mg.out .vbubble{background:linear-gradient(135deg,#162640,#1a1f35);border:1px solid rgba(0,180,216,.22);}
+.mg.in .vbubble{background:var(--panel);border:1px solid var(--border);}
+.vplay{width:36px;height:36px;border-radius:50%;background:var(--accent);border:none;color:#000;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s;}
+.vplay:hover{box-shadow:0 0 12px rgba(0,255,159,.5);}
+.vwave{flex:1;display:flex;align-items:center;gap:2px;height:28px;}
+.vbar{width:3px;border-radius:2px;background:var(--accent);opacity:.45;flex-shrink:0;}
+.vdur{font-size:10px;color:var(--muted);white-space:nowrap;}
+
+/* Upload bubble */
+.uploading-bubble{display:flex;align-items:center;gap:10px;padding:11px 14px;background:var(--panel);border:1px solid var(--border);border-radius:14px;max-width:240px;}
+.up-prog-wrap{flex:1;height:4px;background:var(--border);border-radius:2px;overflow:hidden;}
+.up-prog{height:100%;background:var(--accent);border-radius:2px;transition:width .2s;}
+.up-pct{font-size:10px;color:var(--muted);white-space:nowrap;}
+
+/* ── INPUT BAR ── */
+.input-bar{padding:10px 12px 14px;background:var(--surface);border-top:1px solid var(--border);flex-shrink:0;}
+.preview-bar{display:none;align-items:center;gap:9px;padding:7px 11px;margin-bottom:8px;border-radius:8px;font-size:11px;}
+.preview-bar.file-mode{display:flex;background:rgba(0,255,159,.05);border:1px solid rgba(0,255,159,.15);}
+.preview-bar.rec-mode{display:flex;background:rgba(239,68,68,.05);border:1px solid rgba(239,68,68,.15);color:var(--danger);}
+.pv-name{flex:1;color:var(--accent);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.pv-remove{cursor:pointer;background:none;border:none;font-size:17px;line-height:1;color:var(--danger);}
+.rec-dot{width:8px;height:8px;border-radius:50%;background:var(--danger);animation:recBlink 1s ease infinite;flex-shrink:0;}
+@keyframes recBlink{0%,100%{opacity:1;}50%{opacity:.2;}}
+
+.irow2{display:flex;gap:8px;align-items:flex-end;}
+.attach-lbl{width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:var(--panel);border:1px solid var(--border);border-radius:10px;cursor:pointer;font-size:20px;transition:all .2s;flex-shrink:0;}
+.attach-lbl:hover{border-color:#f59e0b;}
+#file-input{display:none;}
+.msg-ta{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:11px 14px;color:var(--text);font-family:'Space Mono',monospace;font-size:13px;outline:none;resize:none;min-height:44px;max-height:120px;transition:border-color .2s;line-height:1.5;}
+.msg-ta:focus{border-color:var(--accent);}
+.msg-ta::placeholder{color:var(--muted);}
+.voice-btn{width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:var(--panel);border:1px solid var(--border);border-radius:10px;cursor:pointer;font-size:20px;transition:all .2s;flex-shrink:0;user-select:none;}
+.voice-btn.rec{background:rgba(239,68,68,.15);border-color:var(--danger);animation:recPulse 1s ease infinite;}
+@keyframes recPulse{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.4);}50%{box-shadow:0 0 0 8px rgba(239,68,68,0);}}
+.send-btn{width:44px;height:44px;background:var(--accent);border:none;border-radius:10px;color:#000;font-size:19px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s;flex-shrink:0;}
+.send-btn:hover{box-shadow:0 0 20px rgba(0,255,159,.45);transform:scale(1.05);}
+
+/* Image modal */
+.imgmodal{position:fixed;inset:0;background:rgba(0,0,0,.93);display:none;align-items:center;justify-content:center;z-index:300;cursor:zoom-out;}
+.imgmodal.on{display:flex;}
+.imgmodal img{max-width:92vw;max-height:92vh;border-radius:12px;}
+</style>
+</head>
+<body>
+
+<div id="particles-wrap"></div>
+<div class="toast" id="toast"></div>
+<div class="imgmodal" id="imgmodal" onclick="closeImg()"><img id="imgmodal-src" src="" alt=""></div>
+
+<!-- LOADER -->
+<div id="loader">
+  <div class="loader-ring"></div>
+  <div class="loader-txt">Shadow Network Se Jud Raha Hai...</div>
+</div>
+
+<!-- ═══ PAGE: LOGIN ═══ -->
+<div class="page active" id="page-login">
+  <div class="login-wrap">
+    <div class="brand">
+      <span class="brand-icon">🕶️</span>
+      <div class="brand-name">ShadowTalk</div>
+      <div class="brand-sub">Secret · Live · Cross-Device</div>
+    </div>
+    <div class="auth-card">
+      <div class="tabs">
+        <button class="tab on" id="tab-sign" onclick="switchTab('sign')">Sign In</button>
+        <button class="tab" id="tab-reg" onclick="switchTab('reg')">Register</button>
+      </div>
+
+      <!-- Sign In -->
+      <div id="form-sign">
+        <div class="fgroup">
+          <label class="flabel">Apna Shadow ID</label>
+          <input class="finput" id="si-id" placeholder="shadow_ninja_007" autocomplete="off" spellcheck="false">
+        </div>
+        <div class="fgroup">
+          <label class="flabel">Passphrase</label>
+          <input class="finput" type="password" id="si-pass" placeholder="••••••••••" autocomplete="off">
+        </div>
+        <div class="errtxt" id="si-err">❌ Galat ID ya passphrase.</div>
+        <button class="sbtn" id="login-btn" onclick="doLogin()">Shadow Me Dakhil Ho 🔐</button>
+      </div>
+
+      <!-- Register -->
+      <div id="form-reg" style="display:none">
+        <div class="fgroup">
+          <label class="flabel">Apna Secret ID Chuno</label>
+          <div class="irow">
+            <input class="finput" id="rg-id" placeholder="apna_secret_id" autocomplete="off" spellcheck="false">
+            <button class="gen-btn" onclick="genId()" title="Random ID">🎲</button>
+          </div>
+        </div>
+        <div class="fgroup">
+          <label class="flabel">Passphrase</label>
+          <input class="finput" type="password" id="rg-pass" placeholder="Min 4 characters..." autocomplete="off">
+        </div>
+        <div class="fgroup">
+          <label class="flabel">Confirm Passphrase</label>
+          <input class="finput" type="password" id="rg-pass2" placeholder="Dobara likho..." autocomplete="off">
+        </div>
+        <div class="errtxt" id="rg-err"></div>
+        <button class="sbtn" id="reg-btn" onclick="doRegister()">Shadow Identity Banao 👻</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ PAGE: CONTACTS ═══ -->
+<div class="page slide-right" id="page-contacts">
+  <div class="topbar">
+    <div class="topbar-stack">
+      <div class="topbar-title">🕶️ ShadowTalk</div>
+    </div>
+    <span class="enc-pill">🔒 Live</span>
+  </div>
+  <div class="my-id-bar">
+    <div class="my-id-pill">
+      <span class="mid-label">MERA ID</span>
+      <span class="mid-val" id="my-id-val">—</span>
+      <button class="copy-btn" onclick="copyMyId()">📋 Copy</button>
+    </div>
+  </div>
+  <div class="add-bar">
+    <input class="add-input" id="add-input" placeholder="🔍 Dusre ka Shadow ID likho..." spellcheck="false">
+    <button class="add-go" onclick="addContact()">+ Add</button>
+  </div>
+  <div class="contacts-scroll">
+    <div class="sec-label">Shadows</div>
+    <div id="contacts-list">
+      <div class="empty-state"><span class="empty-icon">🕳️</span>Load ho raha hai...</div>
+    </div>
+  </div>
+  <div class="logout-btn" onclick="logout()">👋 Sign Out</div>
+</div>
+
+<!-- ═══ PAGE: CHAT ═══ -->
+<div class="page slide-right" id="page-chat">
+  <div class="topbar">
+    <div class="back-btn" onclick="goBack()">← Back</div>
+    <div id="ct-avatar" style="font-size:26px;flex-shrink:0;">👤</div>
+    <div class="topbar-stack" style="margin-left:4px;">
+      <div class="topbar-title" id="ct-name">—</div>
+      <div class="topbar-sub">● Online · Encrypted</div>
+    </div>
+    <div class="icon-action" onclick="clearChat()" title="Clear chat">🗑️</div>
+  </div>
+  <div class="msgs" id="msgs"></div>
+  <div class="input-bar">
+    <!-- Preview bars -->
+    <div class="preview-bar" id="file-prev-bar">
+      <span>📎</span>
+      <span class="pv-name" id="file-prev-name"></span>
+      <button class="pv-remove" onclick="removeFile()">✕</button>
+    </div>
+    <div class="preview-bar" id="rec-prev-bar">
+      <div class="rec-dot"></div>
+      <span id="rec-timer-txt">Recording... 0s</span>
+      <button class="pv-remove" onclick="cancelRec()" style="margin-left:auto;">✕ Cancel</button>
+    </div>
+    <!-- Input row -->
+    <div class="irow2">
+      <label for="file-input" class="attach-lbl" title="File attach karo">📎</label>
+      <input type="file" id="file-input" onchange="onFileSelect(this)">
+      <textarea class="msg-ta" id="msg-ta" placeholder="Secret message likho..."
+        rows="1" onkeydown="msgKey(event)" oninput="autoH(this)"></textarea>
+      <div class="voice-btn" id="voice-btn">🎙️</div>
+      <button class="send-btn" onclick="sendMsg()">➤</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp }             from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getDatabase, ref, set, get, push, onValue, off, serverTimestamp, remove }
+                                     from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+import { getStorage, ref as sRef, uploadBytesResumable, getDownloadURL }
+                                     from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
+
+/* ══ Firebase Config ══ */
+const firebaseConfig = {
+  apiKey: "AIzaSyA_EUOj71G9h4PLWRxCLeF31_EXnr8Exqg",
+  authDomain: "sarim-8803a.firebaseapp.com",
+  databaseURL: "https://sarim-8803a-default-rtdb.firebaseio.com",
+  projectId: "sarim-8803a",
+  storageBucket: "sarim-8803a.firebasestorage.app",
+  messagingSenderId: "841844097828",
+  appId: "1:841844097828:web:53d6b63f36273c55b8a9b1",
+  measurementId: "G-YRZEX47DSD"
+};
+
+const fbApp   = initializeApp(firebaseConfig);
+const db      = getDatabase(fbApp);
+const storage = getStorage(fbApp);
+
+/* ══ Constants ══ */
+const ADJS  = ['silent','shadow','phantom','ghost','neon','cyber','dark','night','secret','stealth','hidden','void','amber','crimson','iron'];
+const NOUNS = ['wolf','falcon','viper','panther','raven','cipher','pulse','signal','nexus','wraith','flux','specter','knight','storm','ghost'];
+const AVTS  = ['🦊','🐺','🦋','🐉','🌙','⚡','🦅','🐍','🔮','🌑','🦁','🦝','🐙','🦜','🌊','🐯','🦄','🔥'];
+const GRADS = ['#0d1a2a','#1a0d2a','#0d2a1a','#2a0d0d','#0d1f2a','#1f0d2a','#1a1a0d','#0d1a1a'];
+
+/* ══ State ══ */
+let me = null, activePeer = null;
+let pendingFile = null;          // { file, isVoice }
+let chatUnsub = null;            // firebase listener unsub
+let mediaRecorder = null, audioChunks = [], recSecs = 0, recTimer = null;
+let currentPage = 'page-login';
+
+/* ══ Particles ══ */
+(()=>{
+  const w = document.getElementById('particles-wrap');
+  for(let i=0;i<14;i++){
+    const p=document.createElement('div'); p.className='particle';
+    p.style.cssText=`left:${Math.random()*100}%;width:${1+Math.random()*2}px;height:${1+Math.random()*2}px;animation-duration:${9+Math.random()*13}s;animation-delay:${-Math.random()*22}s;`;
+    w.appendChild(p);
+  }
+})();
+
+/* ══ Hide loader once Firebase ready ══ */
+setTimeout(()=>document.getElementById('loader').classList.add('hide'), 800);
+
+/* ══ Toast ══ */
+let toastT;
+window.toast = (msg, type='info') => {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.className = 'toast '+type+' show';
+  clearTimeout(toastT); toastT = setTimeout(()=>el.classList.remove('show'), 3500);
+};
+
+/* ══ Helpers ══ */
+const chatKey  = (a,b) => [a,b].sort().join('__');
+const gradFor  = s => { let h=0; for(let c of s) h=(h*31+c.charCodeAt(0))&0xffff; return GRADS[h%GRADS.length]; };
+const esc      = t => t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+const fmtSize  = b => b<1024?b+' B':b<1048576?(b/1024).toFixed(1)+' KB':(b/1048576).toFixed(1)+' MB';
+const fmtTime  = ts => ts ? new Date(ts).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : '...';
+const fileIcon = n => {
+  const e = n.split('.').pop().toLowerCase();
+  if(['jpg','jpeg','png','gif','webp','svg'].includes(e)) return '🖼️';
+  if(['mp4','webm','mov','avi'].includes(e)) return '🎬';
+  if(['mp3','wav','ogg','flac'].includes(e)) return '🎵';
+  if(e==='pdf') return '📄';
+  if(['zip','rar','7z'].includes(e)) return '🗜️';
+  if(['doc','docx'].includes(e)) return '📝';
+  if(['xls','xlsx'].includes(e)) return '📊';
+  return '📎';
+};
+const showErr = (id, msg) => {
+  const el = document.getElementById(id);
+  el.textContent = msg; el.classList.add('on');
+};
+
+/* ══ Page Navigation ══ */
+window.goTo = id => {
+  document.getElementById(currentPage).classList.remove('active');
+  document.getElementById(currentPage).classList.add('slide-left');
+  document.getElementById(id).classList.remove('slide-right');
+  document.getElementById(id).classList.add('active');
+  currentPage = id;
+};
+
+window.goBack = () => {
+  if(currentPage === 'page-contacts') return;
+  // Detach chat listener
+  if(chatUnsub) { chatUnsub(); chatUnsub = null; }
+  document.getElementById(currentPage).classList.remove('active');
+  document.getElementById(currentPage).classList.add('slide-right');
+  document.getElementById('page-contacts').classList.remove('slide-left');
+  document.getElementById('page-contacts').classList.add('active');
+  currentPage = 'page-contacts';
+  activePeer = null;
+};
+
+/* ══ Tabs / ID Gen ══ */
+window.switchTab = t => {
+  document.getElementById('tab-sign').classList.toggle('on', t==='sign');
+  document.getElementById('tab-reg').classList.toggle('on',  t==='reg');
+  document.getElementById('form-sign').style.display = t==='sign' ? '' : 'none';
+  document.getElementById('form-reg').style.display  = t==='reg'  ? '' : 'none';
+  document.getElementById('si-err').classList.remove('on');
+  document.getElementById('rg-err').classList.remove('on');
+};
+
+window.genId = () => {
+  const a = ADJS[Math.random()*ADJS.length|0];
+  const n = NOUNS[Math.random()*NOUNS.length|0];
+  document.getElementById('rg-id').value = `${a}_${n}_${100+Math.random()*900|0}`;
+};
+
+/* ══ Register ══ */
+window.doRegister = async () => {
+  const id    = document.getElementById('rg-id').value.trim().toLowerCase().replace(/\s+/g,'_');
+  const pass  = document.getElementById('rg-pass').value;
+  const pass2 = document.getElementById('rg-pass2').value;
+  document.getElementById('rg-err').classList.remove('on');
+
+  if(id.length < 3)              { showErr('rg-err','⚠️ ID kam se kam 3 characters ka hona chahiye.'); return; }
+  if(!/^[a-z0-9_]+$/.test(id))  { showErr('rg-err','⚠️ ID me sirf a-z, 0-9, underscore use karo.'); return; }
+  if(pass.length < 4)            { showErr('rg-err','⚠️ Passphrase min 4 characters.'); return; }
+  if(pass !== pass2)             { showErr('rg-err','❌ Passphrases match nahi karte.'); return; }
+
+  const btn = document.getElementById('reg-btn');
+  btn.disabled = true; btn.textContent = 'Checking...';
+
+  try {
+    const snap = await get(ref(db, 'users/'+id));
+    if(snap.exists()) { showErr('rg-err','❌ Ye ID pehle se le liya gaya hai. Koi aur ID try karo.'); btn.disabled=false; btn.textContent='Shadow Identity Banao 👻'; return; }
+    const avatar = AVTS[Math.random()*AVTS.length|0];
+    await set(ref(db,'users/'+id), { passHash: btoa(pass), avatar, ts: Date.now() });
+    toast('✅ Identity ban gayi! Ab sign in karo.','success');
+    document.getElementById('si-id').value = id;
+    switchTab('sign');
+  } catch(e) {
+    showErr('rg-err','❌ Error: '+e.message);
+  }
+  btn.disabled = false; btn.textContent = 'Shadow Identity Banao 👻';
+};
+
+/* ══ Login ══ */
+window.doLogin = async () => {
+  const id   = document.getElementById('si-id').value.trim().toLowerCase();
+  const pass = document.getElementById('si-pass').value;
+  document.getElementById('si-err').classList.remove('on');
+
+  const btn = document.getElementById('login-btn');
+  btn.disabled = true; btn.textContent = 'Checking...';
+
+  try {
+    const snap = await get(ref(db,'users/'+id));
+    if(!snap.exists() || snap.val().passHash !== btoa(pass)) {
+      document.getElementById('si-err').classList.add('on');
+      btn.disabled = false; btn.textContent = 'Shadow Me Dakhil Ho 🔐';
+      return;
+    }
+    me = { id, avatar: snap.val().avatar };
+    document.getElementById('my-id-val').textContent = me.id;
+    goTo('page-contacts');
+    listenContacts();
+  } catch(e) {
+    showErr('si-err','❌ Network error. Internet check karo.');
+  }
+  btn.disabled = false; btn.textContent = 'Shadow Me Dakhil Ho 🔐';
+};
+
+/* ══ Logout ══ */
+window.logout = () => {
+  if(chatUnsub) { chatUnsub(); chatUnsub = null; }
+  me = null; activePeer = null;
+  ['page-contacts','page-chat'].forEach(p=>{
+    const el = document.getElementById(p);
+    el.classList.remove('active','slide-left');
+    el.classList.add('slide-right');
+  });
+  document.getElementById('page-login').classList.remove('slide-left','slide-right');
+  document.getElementById('page-login').classList.add('active');
+  currentPage = 'page-login';
+  document.getElementById('si-pass').value = '';
+  toast('👋 Sign out ho gaye. Shadows me raho.','info');
+};
+
+window.copyMyId = () => {
+  if(!me) return;
+  navigator.clipboard.writeText(me.id).catch(()=>{});
+  toast('📋 Tera ID copy ho gaya!','success');
+};
+
+/* ══ Contacts ══ */
+window.addContact = async () => {
+  const tid = document.getElementById('add-input').value.trim().toLowerCase();
+  if(!tid) { toast('Pehle Shadow ID likho!','error'); return; }
+  if(tid === me.id) { toast('⚠️ Khud ko add nahi kar sakte!','error'); return; }
+
+  try {
+    const snap = await get(ref(db,'users/'+tid));
+    if(!snap.exists()) { toast('❌ Shadow ID nahi mila. Spelling check karo.','error'); return; }
+    const already = await get(ref(db,'contacts/'+me.id+'/'+tid));
+    if(already.exists()) { toast('⚠️ Pehle se connected hai.','info'); return; }
+    await set(ref(db,'contacts/'+me.id+'/'+tid), { avatar: snap.val().avatar, ts: Date.now() });
+    document.getElementById('add-input').value = '';
+    toast(`✅ ${tid} se connect ho gaye!`,'success');
+  } catch(e) {
+    toast('❌ Error: '+e.message,'error');
+  }
+};
+
+function listenContacts() {
+  onValue(ref(db,'contacts/'+me.id), snap => {
+    const list = document.getElementById('contacts-list');
+    const data = snap.val();
+    if(!data) {
+      list.innerHTML = `<div class="empty-state"><span class="empty-icon">🕳️</span>Abhi koi shadow nahi.<br>Upar unka ID search karo aur + Add karo.</div>`;
+      return;
+    }
+    const entries = Object.entries(data).sort((a,b)=>b[1].ts-a[1].ts);
+    list.innerHTML = entries.map(([tid,info]) => `
+      <div class="contact-row" onclick="openChat('${tid}','${info.avatar}')">
+        <div class="c-avatar" style="background:${gradFor(tid)}">${info.avatar}<div class="c-online"></div></div>
+        <div class="c-info">
+          <div class="c-name">${tid}</div>
+          <div class="c-preview" id="prev-${tid}">Load ho raha hai...</div>
+        </div>
+        <div class="chat-btn">💬 Chat</div>
+      </div>`).join('');
+
+    // Last message preview
+    entries.forEach(([tid]) => {
+      const key = chatKey(me.id, tid);
+      get(ref(db,'chats/'+key)).then(s => {
+        const el = document.getElementById('prev-'+tid);
+        if(!el || !s.exists()) { if(el) el.textContent='Abhi koi message nahi'; return; }
+        const msgs = Object.values(s.val()).sort((a,b)=>(a.ts||0)-(b.ts||0));
+        const last = msgs[msgs.length-1];
+        el.textContent = last.type==='voice' ? '🎙️ Voice note' : last.type==='file' ? '📎 '+last.fileName : (last.text||'').substring(0,34);
+      });
+    });
+  });
+}
+
+/* ══ Open Chat ══ */
+window.openChat = (peerId, avatar) => {
+  if(chatUnsub) { chatUnsub(); chatUnsub = null; }
+  activePeer = { id: peerId, avatar };
+  document.getElementById('ct-name').textContent = peerId;
+  document.getElementById('ct-avatar').textContent = avatar;
+  document.getElementById('msgs').innerHTML = '<div class="divider">🔒 Messages load ho rahe hain...</div>';
+  goTo('page-chat');
+  listenMessages();
+  setTimeout(()=>document.getElementById('msg-ta').focus(), 350);
+};
+
+/* ══ Listen Messages (real-time) ══ */
+function listenMessages() {
+  const key = chatKey(me.id, activePeer.id);
+  const msgRef = ref(db,'chats/'+key);
+  const unsub = onValue(msgRef, snap => {
+    renderMessages(snap);
+  });
+  chatUnsub = () => off(msgRef);
+}
+
+function renderMessages(snap) {
+  const area = document.getElementById('msgs');
+  const wasBottom = area.scrollHeight - area.scrollTop - area.clientHeight < 100;
+
+  if(!snap.exists()) {
+    area.innerHTML = `<div class="divider">🔒 Encrypted chat shuru hua</div>
+      <div style="text-align:center;color:var(--muted);font-size:11px;margin-top:8px;">Messages sabhi devices pe live dikhenge 🌐</div>`;
+    return;
+  }
+
+  const msgs = Object.values(snap.val()).sort((a,b)=>(a.ts||0)-(b.ts||0));
+  let html = `<div class="divider">🔒 Live Encrypted</div>`;
+  let lastFrom = null;
+
+  msgs.forEach(m => {
+    const out = m.from === me.id;
+    const time = fmtTime(m.ts);
+    html += `<div class="mg ${out?'out':'in'}">`;
+    if(!out && m.from !== lastFrom) html += `<div class="msg-sender">${m.from}</div>`;
+
+    if(m.type === 'uploading') {
+      html += `<div class="uploading-bubble">
+        <span style="font-size:13px">⏫</span>
+        <div class="up-prog-wrap"><div class="up-prog" style="width:${m.pct||0}%"></div></div>
+        <span class="up-pct">${m.pct||0}%</span>
+      </div>`;
+    } else if(m.type === 'voice') {
+      const bars = Array.from({length:20},()=>`<div class="vbar" style="height:${6+Math.random()*18}px"></div>`).join('');
+      html += `<div class="vbubble">
+        <button class="vplay" onclick="playVoice('${m.url}',this)">▶</button>
+        <div class="vwave">${bars}</div>
+        <div class="vdur">${m.dur||0}s</div>
+      </div>`;
+    } else if(m.type === 'file') {
+      if(m.isImage) {
+        html += `<img class="imgprev" src="${m.url}" alt="${m.fileName}" onclick="openImg('${m.url}')">`;
+      } else {
+        html += `<a class="fbubble" href="${m.url}" target="_blank" rel="noopener">
+          <div class="ficon">${fileIcon(m.fileName)}</div>
+          <div class="fmeta"><div class="fname">${m.fileName}</div><div class="fsize">${m.fileSize||''} · tap to open</div></div>
+        </a>`;
+      }
+    } else {
+      html += `<div class="bubble">${esc(m.text||'')}</div>`;
+    }
+    html += `<div class="msg-time">${time}</div></div>`;
+    lastFrom = m.from;
+  });
+
+  area.innerHTML = html;
+  if(wasBottom || msgs[msgs.length-1]?.from === me.id) area.scrollTop = area.scrollHeight;
+}
+
+/* ══ Send Text ══ */
+window.sendMsg = async () => {
+  if(!activePeer) return;
+  const ta   = document.getElementById('msg-ta');
+  const text = ta.value.trim();
+
+  if(pendingFile) {
+    const { file, isVoice } = pendingFile;
+    pendingFile = null;
+    document.getElementById('file-prev-bar').classList.remove('file-mode');
+    await uploadAndSend(file, isVoice);
+  }
+
+  if(text) {
+    const key = chatKey(me.id, activePeer.id);
+    await push(ref(db,'chats/'+key), { from: me.id, text, type: 'text', ts: Date.now() });
+    ta.value = ''; ta.style.height = 'auto';
+  }
+};
+
+window.msgKey = e => { if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); sendMsg(); } };
+window.autoH  = el => { el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,120)+'px'; };
+
+/* ══ File Select ══ */
+window.onFileSelect = input => {
+  const f = input.files[0]; if(!f) return;
+  if(f.size > 25*1024*1024) { toast('❌ Max 25MB allowed!','error'); return; }
+  pendingFile = { file: f, isVoice: false };
+  document.getElementById('file-prev-name').textContent = f.name + ' ('+fmtSize(f.size)+')';
+  document.getElementById('file-prev-bar').className = 'preview-bar file-mode';
+  input.value = '';
+};
+
+window.removeFile = () => {
+  pendingFile = null;
+  document.getElementById('file-prev-bar').className = 'preview-bar';
+};
+
+/* ══ Upload & Send ══ */
+async function uploadAndSend(file, isVoice=false) {
+  if(!activePeer) return;
+  const key     = chatKey(me.id, activePeer.id);
+  const path    = `files/${key}/${Date.now()}_${file.name||'voice.webm'}`;
+  const storRef = sRef(storage, path);
+
+  // Temp uploading entry
+  const tmpRef = await push(ref(db,'chats/'+key), {
+    from: me.id, type: 'uploading', fileName: file.name||'voice.webm',
+    pct: 0, ts: Date.now()
+  });
+
+  return new Promise(resolve => {
+    const task = uploadBytesResumable(storRef, file);
+    task.on('state_changed',
+      snap => {
+        const pct = Math.round(snap.bytesTransferred/snap.totalBytes*100);
+        set(tmpRef, { from: me.id, type: 'uploading', fileName: file.name||'voice.webm', pct, ts: Date.now() });
+      },
+      err  => { toast('❌ Upload fail: '+err.message,'error'); remove(tmpRef); resolve(); },
+      async () => {
+        const url = await getDownloadURL(task.snapshot.ref);
+        await set(tmpRef, {
+          from: me.id,
+          type: isVoice ? 'voice' : 'file',
+          url,
+          fileName: file.name || 'voice.webm',
+          fileSize: fmtSize(file.size||0),
+          isImage: !isVoice && (file.type||'').startsWith('image/'),
+          dur: isVoice ? recSecs : undefined,
+          ts: Date.now()
+        });
+        resolve();
+      }
+    );
+  });
+}
+
+/* ══ Voice Recording ══ */
+const voiceBtn = document.getElementById('voice-btn');
+
+async function startRec() {
+  if(!activePeer) { toast('Pehle chat kholo!','error'); return; }
+  if(mediaRecorder?.state==='recording') return;
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({audio:true});
+    audioChunks = []; recSecs = 0;
+    mediaRecorder = new MediaRecorder(stream, {mimeType: MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/ogg'});
+    mediaRecorder.ondataavailable = e => { if(e.data.size>0) audioChunks.push(e.data); };
+    mediaRecorder.start(100);
+    voiceBtn.classList.add('rec'); voiceBtn.textContent='⏹️';
+    document.getElementById('rec-prev-bar').className = 'preview-bar rec-mode';
+    recTimer = setInterval(()=>{
+      recSecs++;
+      document.getElementById('rec-timer-txt').textContent = `Recording... ${recSecs}s`;
+      if(recSecs >= 120) stopRec();
+    }, 1000);
+  } catch(e) {
+    toast('🎙️ Mic access nahi mila!','error');
+  }
+}
+
+async function stopRec() {
+  if(!mediaRecorder || mediaRecorder.state!=='recording') return;
+  clearInterval(recTimer);
+  voiceBtn.classList.remove('rec'); voiceBtn.textContent='🎙️';
+  document.getElementById('rec-prev-bar').className = 'preview-bar';
+  mediaRecorder.stop();
+  mediaRecorder.stream.getTracks().forEach(t=>t.stop());
+  mediaRecorder.onstop = async () => {
+    if(recSecs < 1) { toast('⚠️ Bahut choti recording!','info'); return; }
+    const mime = audioChunks[0]?.type || 'audio/webm';
+    const blob = new Blob(audioChunks, {type: mime});
+    const ext  = mime.includes('ogg') ? 'ogg' : 'webm';
+    const file = new File([blob], `voice_${Date.now()}.${ext}`, {type: mime});
+    await uploadAndSend(file, true);
+  };
+}
+
+window.cancelRec = () => {
+  if(!mediaRecorder) return;
+  clearInterval(recTimer);
+  if(mediaRecorder.state==='recording') mediaRecorder.stop();
+  mediaRecorder.stream?.getTracks().forEach(t=>t.stop());
+  mediaRecorder = null; audioChunks = [];
+  voiceBtn.classList.remove('rec'); voiceBtn.textContent='🎙️';
+  document.getElementById('rec-prev-bar').className = 'preview-bar';
+  toast('Recording cancel.','info');
+};
+
+// Touch & mouse events for voice button
+voiceBtn.addEventListener('mousedown',  e=>{ e.preventDefault(); startRec(); });
+voiceBtn.addEventListener('mouseup',    e=>{ e.preventDefault(); stopRec();  });
+voiceBtn.addEventListener('mouseleave', e=>{ if(mediaRecorder?.state==='recording') stopRec(); });
+voiceBtn.addEventListener('touchstart', e=>{ e.preventDefault(); startRec(); }, {passive:false});
+voiceBtn.addEventListener('touchend',   e=>{ e.preventDefault(); stopRec();  }, {passive:false});
+
+/* ══ Play Voice ══ */
+window.playVoice = (url, btn) => {
+  if(btn._audio) {
+    btn._audio.pause(); btn._audio=null; btn.textContent='▶'; return;
+  }
+  const audio = new Audio(url);
+  btn._audio = audio;
+  btn.textContent='⏸';
+  audio.play().catch(()=>{ btn.textContent='▶'; toast('Audio play nahi hua.','error'); });
+  audio.onended = () => { btn.textContent='▶'; btn._audio=null; };
+};
+
+/* ══ Clear Chat ══ */
+window.clearChat = async () => {
+  if(!activePeer || !confirm('Is chat ko clear karo? Wapas nahi aayega.')) return;
+  const key = chatKey(me.id, activePeer.id);
+  await remove(ref(db,'chats/'+key));
+  toast('🗑️ Chat clear ho gayi.','info');
+};
+
+/* ══ Image Modal ══ */
+window.openImg = src => { document.getElementById('imgmodal-src').src=src; document.getElementById('imgmodal').classList.add('on'); };
+window.closeImg = ()  => document.getElementById('imgmodal').classList.remove('on');
+
+/* ══ Keyboard shortcuts ══ */
+document.getElementById('si-id').addEventListener('keydown',   e=>{ if(e.key==='Enter') document.getElementById('si-pass').focus(); });
+document.getElementById('si-pass').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
+document.getElementById('add-input').addEventListener('keydown',e=>{ if(e.key==='Enter') addContact(); });
+</script>
+</body>
+</html>
